@@ -138,8 +138,11 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(updateRunnable)
-        unregisterReceiver(powerReceiver)
-
+        try {
+            unregisterReceiver(powerReceiver)
+        } catch (e: IllegalArgumentException) {
+            Log.w("MainActivity", "Receiver was not registered: ${e.message}")
+        }
     }
 
     private fun initViews() {
