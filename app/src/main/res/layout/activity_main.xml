@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root_layout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="@drawable/animated_gradient"
+    android:padding="16dp">
+
+    <!-- Charging Power Display -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="16dp"
+        android:background="@color/dark_card"
+        android:padding="24dp"
+        android:layout_marginBottom="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center"
+                android:layout_marginBottom="12dp">
+
+                <!-- Lottie Charging Animation (side of text) -->
+                <com.airbnb.lottie.LottieAnimationView
+                    android:id="@+id/charging_animation"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:layout_marginEnd="12dp"
+                    app:lottie_autoPlay="true"
+                    app:lottie_loop="true"
+                    app:lottie_fileName="charging_bolt_red.json" />
+
+                <!-- Charging Power (Big and Highlighted) -->
+                <TextView
+                    android:id="@+id/tv_charging_power"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="42sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/neon_blue_glow"
+                    android:text="0.0 W"
+                    android:fontFamily="@font/audiowide"
+                    android:gravity="center"
+                    android:shadowColor="@color/neon_blue_glow"
+                    android:shadowDx="0"
+                    android:shadowDy="0"
+                    android:shadowRadius="10" />
+            </LinearLayout>
+
+
+            <!-- Data Labels -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:padding="8dp">
+
+                <!-- Voltage & Current (Same Color) -->
+                <TextView
+                    android:id="@+id/tv_voltage"
+                    style="@style/InfoTextStyle"
+                    android:textColor="@color/neon_purple_glow"
+                    android:text="Voltage: 0.0V" />
+
+                <TextView
+                    android:id="@+id/tv_current"
+                    style="@style/InfoTextStyle"
+                    android:textColor="@color/neon_purple_glow"
+                    android:text="Current: 0.0A" />
+
+                <!-- Battery Percentage (Different Color) -->
+                <TextView
+                    android:id="@+id/tv_battery_level"
+                    style="@style/InfoTextStyle"
+                    android:textColor="@color/neon_green_glow"
+                    android:text="Battery Level: 0%" />
+
+                <!-- Temperature (Different Color) -->
+                <TextView
+                    android:id="@+id/tv_battery_temperature"
+                    style="@style/InfoTextStyle"
+                    android:textColor="@color/neon_orange_glow"
+                    android:text="Temperature: 0°C" />
+
+                <!-- Charging Status (Highlighted but less than Power) -->
+                <TextView
+                    android:id="@+id/tv_charging_status"
+                    style="@style/InfoTextStyle"
+                    android:textColor="@color/neon_red"
+                    android:text="Charging: Fast" />
+            </LinearLayout>
+
+<!--             Time Remaining (More Highlighted than Charging Status, Less than Power) -->
+            <TextView
+                android:id="@+id/tv_time_remaining"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Time Remaining"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/primary_dark"
+                android:fontFamily="@font/audiowide"
+                android:gravity="center"
+                android:shadowDx="0"
+                android:shadowDy="0"
+                android:shadowRadius="8"/>
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- Power Usage Chart -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="12dp"
+        android:background="@color/dark_card"
+        android:layout_marginBottom="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Graph Heading (Different Color) -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Power Usage Over Time (W)"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="@color/neon_purple"
+                android:gravity="center"
+                android:layout_marginBottom="12dp"
+                android:fontFamily="@font/audiowide"/>
+
+            <com.github.mikephil.charting.charts.LineChart
+                android:id="@+id/line_chart"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:visibility="visible" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Min/Max Power Stats -->
+    <androidx.cardview.widget.CardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        android:background="@color/dark_card"
+        android:layout_marginTop="12dp"
+        android:padding="12dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:padding="8dp">
+
+            <!-- Min Power (Label & Value Different) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_min_power"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/StatLabelStyle"
+                    android:textColor="@color/neon_green"
+                    android:text="Min Power"
+                    android:gravity="center"/>
+
+                <TextView
+                    android:id="@+id/tv_min_power_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/StatValueStyle"
+                    android:textColor="@color/gray"
+                    android:text="0.0 W"
+                    android:gravity="center"/>
+            </LinearLayout>
+
+<!--            <LinearLayout-->
+<!--                android:layout_width="0dp"-->
+<!--                android:layout_height="wrap_content"-->
+<!--                android:layout_weight="1"-->
+<!--                android:gravity="center_horizontal"-->
+<!--                android:orientation="vertical">-->
+
+<!--                <TextView-->
+<!--                    android:id="@+id/tv_avg_power"-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    style="@style/StatLabelStyle"-->
+<!--                    android:textColor="@color/neon_cyan"-->
+<!--                    android:text="Avg Power"-->
+<!--                    android:gravity="center"/>-->
+
+<!--                <TextView-->
+<!--                    android:id="@+id/tv_avg_power_value"-->
+<!--                    android:layout_width="wrap_content"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    style="@style/StatValueStyle"-->
+<!--                    android:textColor="@color/light_gray"-->
+<!--                    android:text="0.0 W"-->
+<!--                    android:gravity="center"/>-->
+<!--            </LinearLayout>-->
+
+            <!-- Max Power (Label & Value Different) -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_max_power"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/StatLabelStyle"
+                    android:textColor="@color/a_red"
+                    android:text="Max Power"
+                    android:gravity="center"/>
+
+                <TextView
+                    android:id="@+id/tv_max_power_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    style="@style/StatValueStyle"
+                    android:textColor="@color/gray"
+                    android:text="0.0 W"
+                    android:gravity="center"/>
+            </LinearLayout>
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+</LinearLayout>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="dark_background">#121212</color>
+    <color name="dark_card">#1E1E1E</color>
+    <color name="dark_input">#252525</color>
+    <color name="gray">#3C3C3C</color>
+    <color name="primary">#6200EE</color>
+    <color name="primary_dark">#3700B3</color>
+    <color name="dark_disabled">#555555</color>
+    <color name="neon_blue_glow">#0088FF</color>
+
+    <color name="neon_green_glow">#22CC00</color>
+    <color name="notification_bg">#F0F0F0</color> <!-- Light gray, suitable for light theme -->
+
+
+    <color name="neon_purple_glow">#8800DD</color>
+
+    <color name="neon_orange_glow">#DD5500</color>
+    <color name="neon_blue">#00E5FF</color>
+    <color name="neon_purple">#9C27B0</color>
+    <color name="neon_green">#00FF66</color>
+    <color name="neon_cyan">#00FFFF</color>
+    <color name="neon_orange">#FF9100</color>
+    <color name="a_red">#EF5350</color>
+    <color name="neon_red">#FF1744</color>
+
+
+
+</resources>

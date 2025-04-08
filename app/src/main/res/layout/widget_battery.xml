@@ -1,0 +1,61 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_layout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:gravity="center"
+    android:background="@drawable/widget_background"
+    android:elevation="8dp">
+
+    <TextView
+        android:id="@+id/widget_battery_percentage"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="--%"
+        android:textSize="22sp"
+        android:textStyle="bold"
+        android:textColor="@color/neon_blue"
+        android:fontFamily="monospace"
+        android:shadowColor="@color/neon_blue_glow"
+        android:shadowRadius="8"
+        android:layout_gravity="center_horizontal" />
+
+    <TextView
+        android:id="@+id/widget_charging_power"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Power: --W"
+        android:textSize="18sp"
+        android:textColor="@color/neon_green"
+        android:shadowColor="@color/neon_green_glow"
+        android:shadowRadius="6"
+        android:layout_marginTop="4dp"
+        android:layout_gravity="center_horizontal" />
+
+    <TextView
+        android:id="@+id/widget_charging_type"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"
+        android:shadowColor="@color/neon_orange_glow"
+        android:shadowRadius="6"
+        android:text="Charging Type: --"
+        android:textColor="@color/neon_orange"
+        android:textSize="16sp" />
+
+    <TextView
+        android:id="@+id/widget_battery_temperature"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Temp: --°C"
+        android:textSize="16sp"
+        android:textColor="@color/neon_purple"
+        android:shadowColor="@color/neon_purple_glow"
+        android:shadowRadius="6"
+        android:layout_marginTop="4dp"
+        android:layout_gravity="center_horizontal" />
+
+</LinearLayout>
