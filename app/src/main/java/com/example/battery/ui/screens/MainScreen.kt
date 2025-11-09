@@ -2,7 +2,6 @@ package com.example.battery.ui.screens
 
 import android.content.Context
 import android.graphics.Color
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -41,7 +40,7 @@ fun MainScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(BackgroundBlack)
     ) {
         Column(
             modifier = Modifier
@@ -51,7 +50,7 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Charging Power Card
+            // Hero: Charging Power Card
             ChargingPowerCard(
                 batteryData = batteryData,
                 context = context
@@ -79,20 +78,19 @@ fun ChargingPowerCard(
             .fillMaxWidth()
             .shadow(16.dp, shape = MaterialTheme.shapes.extraLarge),
         shape = MaterialTheme.shapes.extraLarge,
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Charging Animation + Power Display
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
+            // HERO: Charging Power Display
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Lottie Animation
                 AndroidView(
@@ -119,66 +117,116 @@ fun ChargingPowerCard(
                             view.playAnimation()
                         }
                     },
-                    modifier = Modifier.size(64.dp)
+                    modifier = Modifier.size(80.dp)
                 )
 
-                Spacer(modifier = Modifier.width(12.dp))
-
-                // Charging Power Text
+                // Large Charging Power - HERO ELEMENT
                 Text(
-                    text = "%.1f W".format(batteryData.chargingPower),
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NeonBlueGlow
+                    text = if (batteryData.isCharging) {
+                        "%.1f W".format(batteryData.chargingPower)
+                    } else {
+                        "Discharging"
+                    },
+                    style = TeckyTextStyles.NumericLarge,
+                    color = if (batteryData.isCharging) {
+                        ChargingPowerColor
+                    } else {
+                        DischargingColor
+                    }
+                )
+
+                // Charging Status
+                Text(
+                    text = batteryData.chargingStatus,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextSecondary
                 )
             }
 
-            // Battery Info
-            Column(
+            Divider(color = TextTertiary.copy(alpha = 0.3f))
+
+            // Battery Stats Grid (2x2)
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                InfoText(
-                    text = "Voltage: %.1fV".format(batteryData.voltage),
-                    color = NeonPurpleGlow
-                )
-                InfoText(
-                    text = "Current: %.3fA".format(batteryData.currentAmps),
-                    color = NeonPurpleGlow
-                )
-                InfoText(
-                    text = "Battery Level: %.1f%%".format(batteryData.batteryPercentage),
-                    color = NeonGreenGlow
-                )
-                InfoText(
-                    text = "Temp: %.1f°C".format(batteryData.temperature),
-                    color = NeonOrangeGlow
-                )
-                InfoText(
-                    text = batteryData.chargingStatus,
-                    color = NeonRed
-                )
+                // Column 1
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatItem(
+                        label = "Voltage",
+                        value = "%.2fV".format(batteryData.voltage),
+                        color = VoltageColor
+                    )
+                    StatItem(
+                        label = "Battery",
+                        value = "%.1f%%".format(batteryData.batteryPercentage),
+                        color = if (batteryData.isCharging) BatteryChargingColor else TextPrimary
+                    )
+                }
+
+                // Column 2
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatItem(
+                        label = "Current",
+                        value = "%.3fA".format(batteryData.currentAmps),
+                        color = CurrentColor
+                    )
+                    StatItem(
+                        label = "Temp",
+                        value = "%.1f°C".format(batteryData.temperature),
+                        color = TemperatureColor
+                    )
+                }
             }
+
+            Divider(color = TextTertiary.copy(alpha = 0.3f))
 
             // Time Remaining
-            Text(
-                text = batteryData.timeRemaining,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = PrimaryDark
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "⌛ ",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = batteryData.timeRemaining,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = TextPrimary
+                )
+            }
         }
     }
 }
 
 @Composable
-fun InfoText(text: String, color: androidx.compose.ui.graphics.Color) {
-    Text(
-        text = text,
-        fontSize = 16.sp,
-        color = color,
-        modifier = Modifier.fillMaxWidth()
-    )
+fun StatItem(
+    label: String,
+    value: String,
+    color: androidx.compose.ui.graphics.Color
+) {
+    Column(
+        horizontalAlignment = Alignment.Start
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = TextSecondary
+        )
+        Text(
+            text = value,
+            style = TeckyTextStyles.NumericMedium.copy(fontSize = 20.sp),
+            color = color
+        )
+    }
 }
 
 @Composable
@@ -189,10 +237,10 @@ fun PowerUsageChartCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .height(300.dp)
+            .height(320.dp)
             .shadow(12.dp, shape = MaterialTheme.shapes.large),
         shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             modifier = Modifier
@@ -201,9 +249,8 @@ fun PowerUsageChartCard(
         ) {
             Text(
                 text = "Power Usage Over Time (W)",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = NeonPurple,
+                style = MaterialTheme.typography.titleLarge,
+                color = ElectricBlue,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 12.dp)
@@ -216,12 +263,11 @@ fun PowerUsageChartCard(
                 ) {
                     Text(
                         text = "Start charging to see graph data",
-                        fontSize = 16.sp,
-                        color = LightGray
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextSecondary
                     )
                 }
             } else {
-                // Use key() to prevent unnecessary recompositions
                 key(graphData.size) {
                     AndroidView(
                         factory = { context ->
@@ -234,11 +280,13 @@ fun PowerUsageChartCard(
                                 setDrawGridBackground(false)
                                 legend.isEnabled = false
                                 axisRight.isEnabled = false
+                                setBackgroundColor(Color.TRANSPARENT)
 
                                 xAxis.apply {
                                     position = XAxis.XAxisPosition.BOTTOM
                                     setDrawGridLines(false)
-                                    textColor = Color.WHITE
+                                    textColor = Color.parseColor("#A0A0A0")
+                                    textSize = 10f
                                     valueFormatter = object : ValueFormatter() {
                                         override fun getFormattedValue(value: Float): String {
                                             return "${value.toInt()}s"
@@ -249,8 +297,9 @@ fun PowerUsageChartCard(
                                 axisLeft.apply {
                                     axisMinimum = 0f
                                     setDrawGridLines(true)
-                                    textColor = Color.WHITE
-                                    gridColor = Color.GRAY
+                                    textColor = Color.parseColor("#A0A0A0")
+                                    gridColor = Color.parseColor("#404040")
+                                    textSize = 10f
                                 }
                             }
                         },
@@ -258,38 +307,31 @@ fun PowerUsageChartCard(
                             if (graphData.isEmpty()) return@AndroidView
 
                             try {
-                                // Convert graph data to chart entries
                                 val startTime = graphData.firstOrNull()?.timestamp ?: 0L
                                 val entries = graphData.mapIndexed { index, data ->
                                     val timeOffset = ((data.timestamp - startTime) / 1000f)
                                     Entry(timeOffset, data.power)
                                 }
 
-                                // Only update if we have valid entries
                                 if (entries.isEmpty()) return@AndroidView
-
-                                // Determine line color based on current power
-                                val lineColor = when {
-                                    batteryData.chargingPower > 20f -> Color.RED
-                                    batteryData.chargingPower in 12.0f..20.0f -> Color.MAGENTA
-                                    batteryData.chargingPower in 4.0f..12.0f -> Color.GREEN
-                                    else -> Color.BLUE
-                                }
 
                                 val dataSet = LineDataSet(entries, "Power Usage").apply {
                                     setDrawCircles(false)
                                     setDrawValues(false)
                                     mode = LineDataSet.Mode.CUBIC_BEZIER
-                                    lineWidth = 2.5f
-                                    color = lineColor
-                                    setDrawFilled(false)
+                                    lineWidth = 3f
+                                    color = Color.parseColor("#00E5FF") // Electric Blue
+
+                                    // CRITICAL: Enable fill with gradient
+                                    setDrawFilled(true)
+                                    fillColor = Color.parseColor("#00E5FF")
+                                    fillAlpha = 100 // 40% opacity for gradient effect
                                 }
 
                                 chart.data = LineData(dataSet)
                                 chart.notifyDataSetChanged()
                                 chart.invalidate()
                             } catch (e: Exception) {
-                                // Handle chart update errors gracefully
                                 android.util.Log.e("MainScreen", "Error updating chart", e)
                             }
                         },
@@ -308,12 +350,12 @@ fun PowerStatsCard(batteryData: BatteryData) {
             .fillMaxWidth()
             .shadow(8.dp, shape = MaterialTheme.shapes.medium),
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             // Min Power
@@ -323,17 +365,24 @@ fun PowerStatsCard(batteryData: BatteryData) {
             ) {
                 Text(
                     text = "Min Power",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = NeonGreen
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextSecondary
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (batteryData.minPower > 0) "%.1f W".format(batteryData.minPower) else "--",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Gray
+                    style = TeckyTextStyles.NumericMedium,
+                    color = BrightGreen
                 )
             }
+
+            // Divider
+            Divider(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(60.dp),
+                color = TextTertiary.copy(alpha = 0.3f)
+            )
 
             // Max Power
             Column(
@@ -342,15 +391,14 @@ fun PowerStatsCard(batteryData: BatteryData) {
             ) {
                 Text(
                     text = "Max Power",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = RedAccent
+                    style = MaterialTheme.typography.labelLarge,
+                    color = TextSecondary
                 )
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = if (batteryData.maxPower > 0) "%.1f W".format(batteryData.maxPower) else "--",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Gray
+                    style = TeckyTextStyles.NumericMedium,
+                    color = NeonRed
                 )
             }
         }

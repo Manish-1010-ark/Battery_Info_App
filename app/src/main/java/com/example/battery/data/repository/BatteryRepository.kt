@@ -9,7 +9,7 @@ import com.example.battery.data.datastore.ConfigDataStore
 import com.example.battery.data.db.GraphData
 import com.example.battery.data.db.GraphDataDao
 import com.example.battery.data.model.BatteryData
-import com.example.battery.widget.BatteryWidgetProvider
+import com.example.battery.widget.BatteryGlanceWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -64,9 +64,6 @@ class BatteryRepository @Inject constructor(
     suspend fun updateCurrentBatteryData() = withContext(Dispatchers.IO) {
         val batteryData = getCurrentBatteryData()
         _batteryDataFlow.value = batteryData
-
-        // Broadcast to widget
-        broadcastWidgetUpdate()
     }
 
     private suspend fun getCurrentBatteryData(): BatteryData {
@@ -252,13 +249,6 @@ class BatteryRepository @Inject constructor(
             else
                 "Discharging: ${timeRemainingMinutes / 60}h ${timeRemainingMinutes % 60}m left"
         }
-    }
-
-    private fun broadcastWidgetUpdate() {
-        val intent = Intent(BatteryWidgetProvider.ACTION_UPDATE_WIDGET).apply {
-            setPackage(context.packageName)
-        }
-        context.sendBroadcast(intent)
     }
 
     // Graph data as Flow for reactive UI

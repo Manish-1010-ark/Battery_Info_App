@@ -2,34 +2,87 @@ package com.example.battery.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Base colors
-val Black = Color(0xFF000000)
-val White = Color(0xFFFFFFFF)
-val DarkBackground = Color(0xFF121212)
-val DarkCard = Color(0xFF1E1E1E)
-val DarkInput = Color(0xFF252525)
-val Gray = Color(0xFF3C3C3C)
-val LightGray = Color(0xFFB0B0B0)
+/**
+ * Tecky/Futuristic Color Palette
+ *
+ * A dark, high-contrast theme inspired by cyberpunk aesthetics,
+ * gaming interfaces, and futuristic tech displays.
+ */
 
-// Primary colors
-val Primary = Color(0xFF6200EE)
-val PrimaryDark = Color(0xFF3700B3)
-val DarkDisabled = Color(0xFF555555)
+// === BACKGROUNDS ===
+/** Near-black background - like a turned-off OLED screen */
+val BackgroundBlack = Color(0xFF0A0A0A)
 
-// Neon glow colors
-val NeonBlueGlow = Color(0xFF0088FF)
-val NeonGreenGlow = Color(0xFF22CC00)
-val NeonPurpleGlow = Color(0xFF8800DD)
-val NeonOrangeGlow = Color(0xFFDD5500)
+/** Dark card/surface color with subtle blue tint - for elevated content */
+val SurfaceDark = Color(0xFF1A1A24)
 
-// Neon colors
-val NeonBlue = Color(0xFF00E5FF)
-val NeonPurple = Color(0xFF9C27B0)
-val NeonGreen = Color(0xFF00FF66)
-val NeonCyan = Color(0xFF00FFFF)
-val NeonOrange = Color(0xFFFF9100)
-val NeonRed = Color(0xFFFF1744)
-val RedAccent = Color(0xFFEF5350)
+/** Slightly lighter surface for nested cards or emphasis */
+val SurfaceLight = Color(0xFF252530)
 
-// Notification
-val NotificationBg = Color(0xFFF0F0F0)
+// === PRIMARY ACCENTS ===
+/** Electric Blue - main accent color for highlights, important text, buttons */
+val ElectricBlue = Color(0xFF00E5FF)
+
+/** Darker blue for pressed/hover states */
+val ElectricBlueDark = Color(0xFF00B8D4)
+
+/** Lighter blue for subtle highlights */
+val ElectricBlueLight = Color(0xFF6EFFFF)
+
+// === TEXT COLORS ===
+/** Primary text - off-white for main content */
+val TextPrimary = Color(0xFFE0E0E0)
+
+/** Secondary text - light gray for labels and subtitles */
+val TextSecondary = Color(0xFFA0A0A0)
+
+/** Tertiary text - darker gray for hints and disabled text */
+val TextTertiary = Color(0xFF707070)
+
+// === STATUS COLORS ===
+/** Neon Red - for alerts, warnings, discharging state, max power */
+val NeonRed = Color(0xFFFF4136)
+
+/** Bright Green - for charging status, success states */
+val BrightGreen = Color(0xFF22FF00)
+
+/** Orange - for temperature warnings */
+val NeonOrange = Color(0xFFFF8800)
+
+/** Yellow - for moderate warnings or attention */
+val NeonYellow = Color(0xFFFFDD00)
+
+// === SEMANTIC COLOR MAPPINGS ===
+/** Use for charging power display */
+val ChargingPowerColor = ElectricBlue
+
+/** Use for discharging state */
+val DischargingColor = NeonRed
+
+/** Use for battery percentage when charging */
+val BatteryChargingColor = BrightGreen
+
+/** Use for battery percentage when discharging */
+val BatteryDischargingColor = NeonRed
+
+/** Use for temperature displays */
+val TemperatureColor = NeonOrange
+
+/** Use for voltage displays */
+val VoltageColor = Color(0xFFAA00FF) // Purple
+
+/** Use for current displays */
+val CurrentColor = Color(0xFF00DDFF) // Cyan
+
+// === GRAPH COLORS ===
+/** Main line color for power graph */
+val GraphLineColor = ElectricBlue
+
+/** Fill gradient start (at the line) */
+val GraphFillStart = ElectricBlue.copy(alpha = 0.6f)
+
+/** Fill gradient end (at the bottom, transparent) */
+val GraphFillEnd = Color.Transparent
+
+/** Grid lines color */
+val GraphGridColor = TextTertiary.copy(alpha = 0.3f)

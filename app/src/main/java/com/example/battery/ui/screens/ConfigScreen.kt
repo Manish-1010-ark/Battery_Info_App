@@ -52,7 +52,7 @@ fun ConfigScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBackground)
+            .background(BackgroundBlack)
     ) {
         Column(
             modifier = Modifier
@@ -64,9 +64,8 @@ fun ConfigScreen(
             // Title
             Text(
                 text = "Battery Configuration",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = NeonBlueGlow,
+                style = MaterialTheme.typography.headlineMedium,
+                color = ElectricBlue,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
@@ -92,7 +91,7 @@ fun ConfigScreen(
             // Battery Capacity Input
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = DarkCard)
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
             ) {
                 Column(
                     modifier = Modifier
@@ -102,9 +101,8 @@ fun ConfigScreen(
                 ) {
                     Text(
                         text = "Battery Capacity",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = White
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary
                     )
 
                     OutlinedTextField(
@@ -118,20 +116,23 @@ fun ConfigScreen(
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = NeonBlueGlow,
-                            unfocusedBorderColor = Gray,
-                            focusedLabelColor = NeonBlueGlow,
-                            unfocusedLabelColor = LightGray,
-                            cursorColor = NeonBlueGlow,
-                            focusedTextColor = White,
-                            unfocusedTextColor = LightGray
-                        )
+                            focusedBorderColor = ElectricBlue,
+                            unfocusedBorderColor = TextTertiary,
+                            focusedLabelColor = ElectricBlue,
+                            unfocusedLabelColor = TextSecondary,
+                            cursorColor = ElectricBlue,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedContainerColor = SurfaceLight,
+                            unfocusedContainerColor = SurfaceLight
+                        ),
+                        textStyle = TeckyTextStyles.NumericMedium
                     )
 
                     if (capacityInput.isEmpty() || capacityInput.toIntOrNull() == null) {
                         Text(
-                            text = "Please enter a valid battery capacity",
-                            fontSize = 12.sp,
+                            text = "⚠ Please enter a valid battery capacity",
+                            style = MaterialTheme.typography.bodySmall,
                             color = NeonRed,
                             modifier = Modifier.padding(top = 4.dp)
                         )
@@ -142,7 +143,7 @@ fun ConfigScreen(
             // Instructions Card
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = DarkCard)
+                colors = CardDefaults.cardColors(containerColor = SurfaceDark)
             ) {
                 Column(
                     modifier = Modifier
@@ -151,25 +152,29 @@ fun ConfigScreen(
                 ) {
                     Text(
                         text = "Instructions",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = White,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = TextPrimary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
+
+                    val instructionText = when {
+                        configState.deviceInfo.isEmpty() ->
+                            "⏳ Loading device information..."
+                        configState.isCollecting ->
+                            "⚡ Collecting battery data... Please wait.\n\n" +
+                                    "Ensure your device is charging for accurate readings."
+                        configState.collectedValues.isEmpty() ->
+                            "⏳ Waiting to start data collection..."
+                        else ->
+                            "✅ Data collection complete!\n\n" +
+                                    "Review the information above and tap Configure to continue."
+                    }
+
                     Text(
-                        text = when {
-                            configState.deviceInfo.isEmpty() ->
-                                "Loading device information..."
-                            configState.isCollecting ->
-                                "⚡ Collecting battery data... Please wait.\n\nEnsure your device is charging for accurate readings."
-                            configState.collectedValues.isEmpty() ->
-                                "Waiting to start data collection..."
-                            else ->
-                                "✅ Data collection complete!\n\nReview the information above and tap Configure to continue."
-                        },
-                        fontSize = 14.sp,
-                        color = LightGray,
-                        lineHeight = 20.sp
+                        text = instructionText,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = TextSecondary,
+                        lineHeight = 22.sp
                     )
                 }
             }
@@ -190,27 +195,23 @@ fun ConfigScreen(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = NeonBlueGlow,
-                    disabledContainerColor = DarkDisabled
+                    containerColor = ElectricBlue,
+                    disabledContainerColor = TextTertiary
                 )
             ) {
                 Text(
                     text = if (configState.isCollecting) "Collecting..." else "Configure",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (configState.canConfigure && capacityInput.toIntOrNull() != null)
-                        DarkBackground
-                    else
-                        Gray
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = BackgroundBlack
                 )
             }
 
-            // Debug info (optional - remove in production)
+            // Debug info (shows sample count)
             if (configState.collectedValues.isNotEmpty()) {
                 Text(
                     text = "Collected ${configState.collectedValues.size} samples",
-                    fontSize = 12.sp,
-                    color = Gray,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextTertiary,
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
@@ -226,7 +227,7 @@ fun InfoCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = DarkCard)
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark)
     ) {
         Column(
             modifier = Modifier
@@ -236,33 +237,32 @@ fun InfoCard(
         ) {
             Text(
                 text = title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = White
+                style = MaterialTheme.typography.titleLarge,
+                color = TextPrimary
             )
 
             if (isLoading) {
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.padding(vertical = 8.dp)
                 ) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(20.dp),
-                        color = NeonBlueGlow,
+                        color = ElectricBlue,
                         strokeWidth = 2.dp
                     )
                     Text(
                         text = content,
-                        fontSize = 16.sp,
-                        color = LightGray
+                        style = TeckyTextStyles.NumericSmall,
+                        color = TextSecondary
                     )
                 }
             } else {
                 Text(
                     text = content,
-                    fontSize = 16.sp,
-                    color = LightGray,
-                    lineHeight = 22.sp
+                    style = TeckyTextStyles.NumericSmall,
+                    color = TextSecondary,
+                    lineHeight = 20.sp
                 )
             }
         }
