@@ -63,11 +63,11 @@ object BatteryDataStateDefinition : GlanceStateDefinition<BatteryData> {
                     isCharging = json.optBoolean("isCharging", false),
                     chargingType = json.optString("chargingType", "Unknown"),
                     sourceType = json.optString("sourceType", ""),
-                    timeRemaining = json.optString("timeRemaining", "Calculating..."),
+                    timeRemainingCharging = json.optString("timeRemaining", "Calculating..."),
                     chargingStatus = json.optString("chargingStatus", "Unknown"),
-                    minPower = json.optDouble("minPower", 0.0).toFloat(),
-                    maxPower = json.optDouble("maxPower", 0.0).toFloat(),
-                    avgPower = json.optDouble("avgPower", 0.0).toFloat(),
+//                    minPower = json.optDouble("minPower", 0.0).toFloat(),
+//                    maxPower = json.optDouble("maxPower", 0.0).toFloat(),
+//                    avgPower = json.optDouble("avgPower", 0.0).toFloat(),
                     pluggedType = json.optInt("pluggedType", -1)
                 )
 
@@ -94,11 +94,11 @@ object BatteryDataStateDefinition : GlanceStateDefinition<BatteryData> {
                     put("isCharging", t.isCharging)
                     put("chargingType", t.chargingType)
                     put("sourceType", t.sourceType)
-                    put("timeRemaining", t.timeRemaining)
+                    put("timeRemaining", t.timeRemainingCharging)
                     put("chargingStatus", t.chargingStatus)
-                    put("minPower", t.minPower.toDouble())
-                    put("maxPower", t.maxPower.toDouble())
-                    put("avgPower", t.avgPower.toDouble())
+//                    put("minPower", t.minPower.toDouble())
+//                    put("maxPower", t.maxPower.toDouble())
+//                    put("avgPower", t.avgPower.toDouble())
                     put("pluggedType", t.pluggedType)
                 }
 

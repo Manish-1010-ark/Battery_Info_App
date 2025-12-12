@@ -1,26 +1,34 @@
 package com.example.battery.data.repository
 
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
+import android.util.Log
 import com.example.battery.data.datastore.ConfigDataStore
-import com.example.battery.data.db.GraphData
-import com.example.battery.data.db.GraphDataDao
+import com.example.battery.data.db.ChargingPowerDao
+import com.example.battery.data.db.DischargingPowerDao
+import com.example.battery.data.db.TemperatureDao
+import com.example.battery.data.db.ChargingPower
+import com.example.battery.data.db.DischargingPower
+import com.example.battery.data.db.TemperatureSample
 import com.example.battery.data.model.BatteryData
-import com.example.battery.widget.BatteryGlanceWidget
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
-import kotlin.math.max
 
 data class ConfigData(
     val manufacturer: String,
@@ -31,46 +39,236 @@ data class ConfigData(
     val currentSamples: List<Float> = emptyList()
 )
 
+data class TimeRemainingResult(
+    val chargingModeText: String?,
+    val dischargingOnText: String?,
+    val dischargingOffText: String?,
+    val state: TimeState
+)
+
+enum class TimeState {
+    FULL, CALCULATING, STABILIZING, FINISHING, NORMAL
+}
+
+enum class TimeRange(val milliseconds: Long) {
+    MIN_5(5 * 60 * 1000L),
+    HOUR_1(60 * 60 * 1000L),
+    DAY_1(24 * 60 * 60 * 1000L)
+}
+
 @Singleton
 class BatteryRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val graphDataDao: GraphDataDao,
+    private val chargingPowerDao: ChargingPowerDao,
+    private val dischargingPowerDao: DischargingPowerDao,
+    private val temperatureDao: TemperatureDao,
     private val configDataStore: ConfigDataStore
 ) {
     private val batteryManager: BatteryManager by lazy {
         context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager
     }
 
-    // THE SINGLE SOURCE OF TRUTH - Repository owns the StateFlow
     private val _batteryDataFlow = MutableStateFlow(BatteryData.EMPTY)
     val batteryDataFlow: StateFlow<BatteryData> = _batteryDataFlow.asStateFlow()
 
-    // Current sampling for averaging
-    private val currentSamples = mutableListOf<Float>()
-    private var currentSampleCounter = 0
-    private var avgCurrentFor10Sec = 0f
-
-    // Power tracking
-    private var minPower: Float = -1f
-    private var maxPower: Float = -1f
     private var chargerConnected = false
+    private var lastChargingInsertTime = 0L
+    private var lastDischargingInsertTime = 0L
+    private var lastTemperatureInsertTime = 0L
+    private var sampleCounter = 0
+    private var isScreenOn: Boolean = true
+    private var screenStateRegistered = false
 
-    private var lastDbInsertTime = 0L
+    private var emaCurrentGeneral: Float = 0f
+    private var emaCurrentScreenOn: Float = 0f
+    private var emaCurrentScreenOff: Float = 0f
+    private var emaInitialized = false
+    private var stabilizationCounter = 0
+
+    private val EMA_ALPHA = 0.20f
+    private val STABILIZATION_SAMPLES = 5
+
+    // BATCH 6: Analytics sampling intervals (UPDATED)
+    private val CHARGING_SAMPLE_INTERVAL = 1_000L      // 1 second (was 5 seconds)
+    private val DISCHARGING_SAMPLE_INTERVAL = 1_000L   // 1 second (was 15 seconds)
+    private val TEMPERATURE_SAMPLE_INTERVAL = 10_000L  // 10 seconds (was 15 seconds)
+
+    // Cleanup interval - every 30 minutes
+    private val CLEANUP_INTERVAL = 30 * 60 * 1000L
+    private var lastCleanupTime = 0L
+
+    // Repository scope for background operations
+    private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    init {
+        registerScreenStateReceiver()
+        schedulePeriodicCleanup()
+    }
 
     /**
-     * Main update function called by BatteryMonitorService.
-     * This updates the StateFlow and broadcasts to widget.
+     * SECTION A - Calculate power from voltage and current
      */
+    private fun calculatePower(voltage: Float, currentA: Float): Float {
+        return voltage * currentA
+    }
+
+    private fun registerScreenStateReceiver() {
+        if (screenStateRegistered) return
+
+        try {
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context?, intent: Intent?) {
+                    when (intent?.action) {
+                        Intent.ACTION_SCREEN_ON -> {
+                            isScreenOn = true
+                            Log.d(TAG, "📱 Screen ON")
+                        }
+                        Intent.ACTION_SCREEN_OFF -> {
+                            isScreenOn = false
+                            Log.d(TAG, "📱 Screen OFF")
+                        }
+                    }
+                }
+            }
+
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_SCREEN_OFF)
+            }
+
+            context.registerReceiver(receiver, filter)
+            screenStateRegistered = true
+            Log.d(TAG, "✅ Screen state receiver registered")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to register screen state receiver", e)
+        }
+    }
+
+    /**
+     * SECTION B - Schedule periodic cleanup with isActive check
+     */
+    private fun schedulePeriodicCleanup() {
+        repositoryScope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(CLEANUP_INTERVAL)
+                cleanupOldData()
+            }
+        }
+    }
+
+    /**
+     * Clean up database entries older than 24 hours
+     */
+    private suspend fun cleanupOldData() {
+        val now = System.currentTimeMillis()
+        if (now - lastCleanupTime < CLEANUP_INTERVAL) return
+
+        try {
+            val cutoffTime = now - TimeRange.DAY_1.milliseconds
+
+            chargingPowerDao.deleteOlderThan(cutoffTime)
+            dischargingPowerDao.deleteOlderThan(cutoffTime)
+            temperatureDao.deleteOlderThan(cutoffTime)
+
+            lastCleanupTime = now
+            Log.d(TAG, "🧹 Cleaned up analytics data older than 24 hours")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to cleanup old data", e)
+        }
+    }
+
     suspend fun updateCurrentBatteryData() = withContext(Dispatchers.IO) {
-        val batteryData = getCurrentBatteryData()
-        _batteryDataFlow.value = batteryData
+        try {
+            val batteryData = getCurrentBatteryData()
+            sampleCounter++
+
+            if (batteryData.isCharging != _batteryDataFlow.value.isCharging || sampleCounter % 5 == 0) {
+                Log.d(TAG, "🔌 [Update $sampleCounter] CHARGING: ${batteryData.isCharging}, " +
+                        "power=${batteryData.chargingPower}W, " +
+                        "current=${batteryData.currentAmps}A, " +
+                        "voltage=${batteryData.voltage}V")
+            }
+
+            _batteryDataFlow.value = batteryData
+
+            // Log analytics data asynchronously
+            logAnalyticsData(batteryData)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Error updating battery data", e)
+        }
+    }
+
+    /**
+     * Log analytics data (charging/discharging power + temperature)
+     * BATCH 6: Updated intervals - 1s for power, 10s for temperature
+     */
+    private fun logAnalyticsData(batteryData: BatteryData) {
+        repositoryScope.launch {
+            try {
+                val now = System.currentTimeMillis()
+
+                // 1. Log charging power (every 1 second - UPDATED)
+                if (batteryData.isCharging &&
+                    batteryData.chargingPower > 0 &&
+                    now - lastChargingInsertTime >= CHARGING_SAMPLE_INTERVAL
+                ) {
+                    chargingPowerDao.insert(
+                        ChargingPower(
+                            power = batteryData.chargingPower,
+                            timestamp = now
+                        )
+                    )
+                    lastChargingInsertTime = now
+                }
+
+                // 2. Log discharging power (every 1 second - UPDATED)
+                if (!batteryData.isCharging &&
+                    now - lastDischargingInsertTime >= DISCHARGING_SAMPLE_INTERVAL
+                ) {
+                    val dischargingPower = calculatePower(batteryData.voltage, batteryData.currentAmps)
+
+                    if (dischargingPower > 0) {
+                        dischargingPowerDao.insert(
+                            DischargingPower(
+                                power = dischargingPower,
+                                timestamp = now
+                            )
+                        )
+                        lastDischargingInsertTime = now
+
+                        if (sampleCounter % 3 == 0) {
+                            Log.d(TAG, "📉 Discharging: ${dischargingPower}W " +
+                                    "(${batteryData.voltage}V × ${batteryData.currentAmps}A)")
+                        }
+                    }
+                }
+
+                // 3. Log temperature (every 10 seconds - UPDATED from 15s)
+                if (now - lastTemperatureInsertTime >= TEMPERATURE_SAMPLE_INTERVAL) {
+                    temperatureDao.insert(
+                        TemperatureSample(
+                            temp = batteryData.temperature,
+                            timestamp = now
+                        )
+                    )
+                    lastTemperatureInsertTime = now
+
+                    if (sampleCounter % 3 == 0) {
+                        Log.d(TAG, "🌡️ Temperature: ${batteryData.temperature}°C")
+                    }
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to log analytics data", e)
+            }
+        }
     }
 
     private suspend fun getCurrentBatteryData(): BatteryData {
         val batteryIntent = context.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
             ?: return BatteryData.EMPTY
 
-        // Extract raw battery info
         val rawVoltage = batteryIntent.getIntExtra(BatteryManager.EXTRA_VOLTAGE, 0).toFloat()
         val voltage = if (rawVoltage > 100) rawVoltage / 1000f else rawVoltage
 
@@ -86,10 +284,26 @@ class BatteryRepository @Inject constructor(
 
         val plugged = batteryIntent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
 
-        // Get current in Amps
+        val healthCode = batteryIntent.getIntExtra(BatteryManager.EXTRA_HEALTH, -1)
+        val batteryHealth = getBatteryHealthStatus(healthCode)
+
+        val chemistry = batteryIntent.getStringExtra(BatteryManager.EXTRA_TECHNOLOGY) ?: "Unknown"
+
+        val cycleCount = if (Build.VERSION.SDK_INT >= 34) {
+            val rawCycleCount = batteryIntent.getIntExtra("android.os.extra.CYCLE_COUNT", 0)
+            Log.d(TAG, "🔄 Raw android.os.extra.CYCLE_COUNT = $rawCycleCount")
+            rawCycleCount
+        } else {
+            Log.d(TAG, "🔄 Cycle Count not supported (SDK < 34)")
+            0
+        }
+
+        val now = System.currentTimeMillis()
+
         var currentNow = try {
             batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
         } catch (e: Exception) {
+            Log.w(TAG, "Failed to get current, using cached value", e)
             configDataStore.getLastCurrentNow()
         }
 
@@ -104,62 +318,24 @@ class BatteryRepository @Inject constructor(
             else currentNow / 1_000f
         )
 
-        // Update current samples for averaging
-        currentSamples.add(currentAmps)
-        currentSampleCounter++
+        updateEmaCurrents(currentAmps, isCharging)
 
-        if (currentSampleCounter >= 10) {
-            avgCurrentFor10Sec = currentSamples.average().toFloat()
-            currentSamples.clear()
-            currentSampleCounter = 0
-        }
+        val chargingPower = calculatePower(voltage, currentAmps)
 
-        val chargingPower = voltage * currentAmps
-
-        // Reset min/max when charger is plugged in
         if (isCharging && !chargerConnected) {
-            resetMinMaxPower()
             chargerConnected = true
         } else if (!isCharging) {
             chargerConnected = false
         }
 
-        // Update min and max power
-        if (minPower <= 0f || chargingPower < minPower) {
-            minPower = max(0.1f, chargingPower)
-            configDataStore.saveMinPower(minPower)
-        }
-
-        if (chargingPower > maxPower) {
-            maxPower = chargingPower
-            configDataStore.saveMaxPower(maxPower)
-        }
-
-        // Save charging power to database for graph
-        if (isCharging && chargingPower > 0) {
-            graphDataDao.insertChargingPower(
-                GraphData(power = chargingPower, timestamp = System.currentTimeMillis())
-            )
-        }
-
-        if (isCharging && chargingPower > 0) {
-            val now = System.currentTimeMillis()
-            if (now - lastDbInsertTime >= 5000L) { // 5 seconds
-                graphDataDao.insertChargingPower(
-                    GraphData(power = chargingPower, timestamp = now)
-                )
-                lastDbInsertTime = now
-            }
-        }
-
-        // Calculate charging status and type
         val chargingType = when {
             !isCharging -> "Discharging"
-            chargingPower > 20 -> "Super Fast Charging ⚡⚡⚡"
-            chargingPower in 12.0..20.0 -> "Fast Charging ⚡⚡"
-            chargingPower in 4.0..12.0 -> "Normal Charging ⚡"
-            chargingPower < 4.0 -> "Slow Charging"
-            else -> "Not Charging"
+            chargingPower >= 40.0f -> "Hyper Charging 🚀"
+            chargingPower >= 20.0f -> "Super Fast Charging ⚡⚡"
+            chargingPower >= 10.0f -> "Fast Charging ⚡"
+            chargingPower >= 5.0f -> "Normal Charging"
+            chargingPower > 0.1f -> "Trickle Charging ⏳"
+            else -> "Connected / Idle"
         }
 
         val sourceType = when (plugged) {
@@ -171,8 +347,17 @@ class BatteryRepository @Inject constructor(
 
         val chargingStatus = if (isCharging) "Charging: $chargingType $sourceType" else "Discharging"
 
-        // Calculate time remaining
-        val timeRemaining = calculateTimeRemaining(batteryPct, voltage, avgCurrentFor10Sec, isCharging)
+        val (thermalStatus, thermalLevel) = getThermalStatus(temperature)
+
+        val designCapacityMah = getBatteryCapacityFromAPI()
+
+        val timeResult = computeTimeRemaining(
+            batteryPct,
+            currentAmps,
+            designCapacityMah,
+            isCharging,
+            isScreenOn
+        )
 
         return BatteryData(
             batteryPercentage = batteryPct,
@@ -184,132 +369,184 @@ class BatteryRepository @Inject constructor(
             chargingStatus = chargingStatus,
             chargingType = chargingType,
             sourceType = sourceType,
-            minPower = minPower,
-            maxPower = maxPower,
-            avgPower = avgCurrentFor10Sec * voltage,
-            timeRemaining = timeRemaining,
+            timeRemainingCharging = timeResult.chargingModeText,
+            timeRemainingOnScreen = timeResult.dischargingOnText,
+            timeRemainingOffScreen = timeResult.dischargingOffText,
+            timeRemainingState = timeResult.state.name,
             pluggedType = plugged,
-            timestamp = System.currentTimeMillis()
+            thermalStatus = thermalStatus,
+            thermalLevel = thermalLevel,
+            batteryHealth = batteryHealth,
+            designCapacityMah = designCapacityMah,
+            cycleCount = cycleCount,
+            chemistry = chemistry,
+            timestamp = now
         )
     }
 
-    private suspend fun resetMinMaxPower() {
-        minPower = 0f
-        maxPower = 0f
-        configDataStore.resetMinMaxPower()
+    private fun updateEmaCurrents(currentAmps: Float, isCharging: Boolean) {
+        if (!emaInitialized) {
+            emaCurrentGeneral = currentAmps
+            emaCurrentScreenOn = currentAmps
+            emaCurrentScreenOff = currentAmps
+            emaInitialized = true
+            stabilizationCounter = 0
+            return
+        }
+
+        if (stabilizationCounter < STABILIZATION_SAMPLES) {
+            stabilizationCounter++
+        }
+
+        emaCurrentGeneral = EMA_ALPHA * currentAmps + (1 - EMA_ALPHA) * emaCurrentGeneral
+
+        if (!isCharging) {
+            if (isScreenOn) {
+                emaCurrentScreenOn = EMA_ALPHA * currentAmps + (1 - EMA_ALPHA) * emaCurrentScreenOn
+            } else {
+                emaCurrentScreenOff = EMA_ALPHA * currentAmps + (1 - EMA_ALPHA) * emaCurrentScreenOff
+            }
+        }
     }
 
-    private suspend fun calculateTimeRemaining(
-        batteryPct: Float,
-        voltage: Float,
-        avgCurrent: Float,
-        isCharging: Boolean
-    ): String {
-        var chargeCounter = try {
-            batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CHARGE_COUNTER).toFloat()
-        } catch (e: Exception) {
-            0f
+    private fun computeTimeRemaining(
+        percentage: Float,
+        currentNowA: Float,
+        designCapacityMah: Int,
+        isCharging: Boolean,
+        screenOn: Boolean
+    ): TimeRemainingResult {
+        if (percentage >= 100f) {
+            return TimeRemainingResult(
+                chargingModeText = null,
+                dischargingOnText = null,
+                dischargingOffText = null,
+                state = TimeState.FULL
+            )
         }
 
-        if (chargeCounter <= 0 || batteryPct <= 0) {
-            return "Calculating..."
+        if (stabilizationCounter < STABILIZATION_SAMPLES) {
+            return TimeRemainingResult(
+                chargingModeText = "Stabilizing…",
+                dischargingOnText = "Stabilizing…",
+                dischargingOffText = "Stabilizing…",
+                state = TimeState.STABILIZING
+            )
         }
 
-        if (chargeCounter == null || chargeCounter <= 0 || batteryPct <= 0) {
-            return "Calculating..."
+        if (emaCurrentGeneral < 0.05f) {
+            return TimeRemainingResult(
+                chargingModeText = "Calculating…",
+                dischargingOnText = "Calculating…",
+                dischargingOffText = "Calculating…",
+                state = TimeState.CALCULATING
+            )
         }
 
-        if (chargeCounter > 10000) {
-            chargeCounter /= 1000f
+        if (designCapacityMah <= 0) {
+            return TimeRemainingResult(
+                chargingModeText = "Calculating…",
+                dischargingOnText = "Calculating…",
+                dischargingOffText = "Calculating…",
+                state = TimeState.CALCULATING
+            )
         }
 
-        val batteryCapacityMah = chargeCounter / (batteryPct / 100f)
-        val batteryCapacityWh = (batteryCapacityMah * voltage) / 1000f
-        val efficiencyFactor = 0.85f
+        if (isCharging) {
+            if (emaCurrentGeneral < 0.1f && percentage > 98f) {
+                return TimeRemainingResult(
+                    chargingModeText = "Finishing…",
+                    dischargingOnText = null,
+                    dischargingOffText = null,
+                    state = TimeState.FINISHING
+                )
+            }
 
-        val avgPower = voltage * avgCurrent * efficiencyFactor
-        if (avgPower <= 0) return "Calculating..."
+            val remainingToFullMah = designCapacityMah * (1 - percentage / 100f)
+            val timeHours = remainingToFullMah / (emaCurrentGeneral * 1000f)
+            val timeMinutes = (timeHours * 60).toInt()
 
-        val timeRemainingMinutes = if (isCharging) {
-            val remainingPercentage = (100f - batteryPct) / 100f
-            ((remainingPercentage * batteryCapacityWh) / avgPower * 60).toInt()
+            val chargingText = formatTimeRemaining(timeMinutes, true)
+
+            return TimeRemainingResult(
+                chargingModeText = chargingText,
+                dischargingOnText = null,
+                dischargingOffText = null,
+                state = TimeState.NORMAL
+            )
         } else {
-            val dischargePower = 4.0f
-            ((batteryPct * batteryCapacityWh) / dischargePower).toInt()
-        }
+            val remainingMah = designCapacityMah * (percentage / 100f)
 
+            val onHours = if (emaCurrentScreenOn > 0.05f) {
+                remainingMah / (emaCurrentScreenOn * 1000f)
+            } else {
+                0f
+            }
+
+            val offHours = if (emaCurrentScreenOff > 0.05f) {
+                remainingMah / (emaCurrentScreenOff * 1000f)
+            } else {
+                0f
+            }
+
+            val onMinutes = (onHours * 60).toInt()
+            val offMinutes = (offHours * 60).toInt()
+
+            val onText = if (onMinutes > 0) formatTimeRemaining(onMinutes, false) else null
+            val offText = if (offMinutes > 0) formatTimeRemaining(offMinutes, false) else null
+
+            return TimeRemainingResult(
+                chargingModeText = null,
+                dischargingOnText = onText,
+                dischargingOffText = offText,
+                state = TimeState.NORMAL
+            )
+        }
+    }
+
+    private fun formatTimeRemaining(minutes: Int, isCharging: Boolean): String {
         return when {
-            timeRemainingMinutes < 1 -> "Less than a minute"
-            timeRemainingMinutes < 60 -> if (isCharging)
-                "$timeRemainingMinutes min left"
-            else
-                "Discharging: $timeRemainingMinutes min left"
-            else -> if (isCharging)
-                "${timeRemainingMinutes / 60}h ${timeRemainingMinutes % 60}m left"
-            else
-                "Discharging: ${timeRemainingMinutes / 60}h ${timeRemainingMinutes % 60}m left"
+            minutes < 1 -> if (isCharging) "Less than a minute" else "Less than a minute"
+            minutes < 60 -> {
+                if (isCharging) "$minutes min to full charge" else "$minutes min"
+            }
+            else -> {
+                val hours = minutes / 60
+                val mins = minutes % 60
+                if (isCharging) {
+                    if (mins == 0) "$hours hour${if (hours != 1) "s" else ""} to full charge"
+                    else "$hours hour${if (hours != 1) "s" else ""} $mins min to full charge"
+                } else {
+                    if (mins == 0) "$hours hour${if (hours != 1) "s" else ""}"
+                    else "$hours hour${if (hours != 1) "s" else ""} $mins min"
+                }
+            }
         }
     }
 
-    // Graph data as Flow for reactive UI
-    fun getGraphDataFlow(durationMillis: Long): Flow<List<GraphData>> {
-        val cutoffTime = System.currentTimeMillis() - durationMillis
-        return graphDataDao.getChargingPowerDataFlow(cutoffTime)
-    }
-
-    suspend fun clearGraphData() = withContext(Dispatchers.IO) {
-        graphDataDao.clearChargingPowerData()
-    }
-
-    suspend fun isConfigured(): Boolean {
-        return configDataStore.isConfigured()
-    }
-
-    suspend fun loadStoredPowerStats() {
-        minPower = configDataStore.getMinPower()
-        maxPower = configDataStore.getMaxPower()
-    }
-
-    // Config screen helper functions
-    suspend fun getInitialConfigData(): ConfigData = withContext(Dispatchers.IO) {
-        val manufacturer = Build.MANUFACTURER
-        val model = Build.MODEL
-        val androidVersion = Build.VERSION.RELEASE
-
-        // Detect current unit
-        val currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-            .toFloat()
-        val unit = if (abs(currentNow) > 10000) "µA" else "mA"
-
-        // Auto-detect battery capacity
-        val detectedCapacity = getBatteryCapacity()
-
-        ConfigData(
-            manufacturer = manufacturer,
-            model = model,
-            androidVersion = androidVersion,
-            currentUnit = unit,
-            detectedCapacity = detectedCapacity
-        )
-    }
-
-    suspend fun collectCurrentSample(): Float = withContext(Dispatchers.IO) {
-        val currentNow = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW)
-            .toFloat()
-        abs(
-            if (abs(currentNow) > 10000) currentNow / 1_000_000f
-            else currentNow / 1_000f
-        )
-    }
-
-    suspend fun saveConfiguration(capacity: Int, currentPattern: List<Float>) {
-        configDataStore.saveBatteryCapacity(capacity)
-        if (currentPattern.isNotEmpty()) {
-            configDataStore.saveCurrentPattern(currentPattern)
+    private fun getThermalStatus(temperature: Float): Pair<String, Int> {
+        return when {
+            temperature < 22f -> "Cool" to 0
+            temperature < 35f -> "Normal" to 1
+            temperature < 42f -> "Warm" to 2
+            temperature < 48f -> "Hot" to 3
+            else -> "Critical" to 4
         }
     }
 
-    private fun getBatteryCapacity(): Int {
+    private fun getBatteryHealthStatus(healthCode: Int): String {
+        return when (healthCode) {
+            BatteryManager.BATTERY_HEALTH_GOOD -> "Good"
+            BatteryManager.BATTERY_HEALTH_OVERHEAT -> "Overheating"
+            BatteryManager.BATTERY_HEALTH_DEAD -> "Dead"
+            BatteryManager.BATTERY_HEALTH_OVER_VOLTAGE -> "Over Voltage"
+            BatteryManager.BATTERY_HEALTH_UNSPECIFIED_FAILURE -> "Unspecified Failure"
+            BatteryManager.BATTERY_HEALTH_COLD -> "Cold"
+            else -> "Unknown"
+        }
+    }
+
+    private fun getBatteryCapacityFromAPI(): Int {
         return try {
             val powerProfileClass = Class.forName("com.android.internal.os.PowerProfile")
             val constructor = powerProfileClass.getConstructor(Context::class.java)
@@ -317,7 +554,89 @@ class BatteryRepository @Inject constructor(
             val method = powerProfileClass.getMethod("getBatteryCapacity")
             (method.invoke(powerProfile) as Double).toInt()
         } catch (e: Exception) {
+            Log.w(TAG, "Failed to get battery capacity from API", e)
             0
         }
+    }
+
+    // ====== ANALYTICS DATA ACCESS METHODS ======
+
+    /**
+     * Get charging power data flow for analytics
+     */
+    fun getChargingPowerFlow(cutoffTime: Long): Flow<List<ChargingPower>> {
+        return chargingPowerDao.getFlow(cutoffTime)
+    }
+
+    /**
+     * Get discharging power data flow for analytics
+     */
+    fun getDischargingPowerFlow(cutoffTime: Long): Flow<List<DischargingPower>> {
+        return dischargingPowerDao.getFlow(cutoffTime)
+    }
+
+    /**
+     * Get temperature data flow for analytics
+     */
+    fun getTemperatureFlow(cutoffTime: Long): Flow<List<TemperatureSample>> {
+        return temperatureDao.getFlow(cutoffTime)
+    }
+
+    // ====== CONFIGURATION METHODS ======
+
+    suspend fun isConfigured(): Boolean {
+        return try {
+            configDataStore.isConfigured()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to check config status", e)
+            false
+        }
+    }
+
+    suspend fun loadStoredPowerStats() {
+        Log.d(TAG, "📊 Power stats loading skipped (min/max removed)")
+    }
+
+    suspend fun getInitialConfigData(): ConfigData = withContext(Dispatchers.IO) {
+        val currentNow = try {
+            batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW).toFloat()
+        } catch (e: Exception) {
+            0f
+        }
+
+        ConfigData(
+            manufacturer = Build.MANUFACTURER,
+            model = Build.MODEL,
+            androidVersion = Build.VERSION.RELEASE,
+            currentUnit = if (abs(currentNow) > 10000) "µA" else "mA",
+            detectedCapacity = getBatteryCapacityFromAPI()
+        )
+    }
+
+    suspend fun collectCurrentSample(): Float = withContext(Dispatchers.IO) {
+        val currentNow = try {
+            batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW).toFloat()
+        } catch (e: Exception) {
+            0f
+        }
+
+        abs(if (abs(currentNow) > 10000) currentNow / 1_000_000f else currentNow / 1_000f)
+    }
+
+    suspend fun saveConfiguration(capacity: Int, currentPattern: List<Float>) {
+        try {
+            configDataStore.saveBatteryCapacity(capacity)
+            if (currentPattern.isNotEmpty()) {
+                configDataStore.saveCurrentPattern(currentPattern)
+            }
+            Log.d(TAG, "✅ Configuration saved: capacity=$capacity mAh")
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ Failed to save configuration", e)
+            throw e
+        }
+    }
+
+    companion object {
+        private const val TAG = "BatteryRepository"
     }
 }

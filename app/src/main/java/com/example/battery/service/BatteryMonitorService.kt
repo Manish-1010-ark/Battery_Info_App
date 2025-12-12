@@ -31,15 +31,18 @@ import javax.inject.Inject
 import android.graphics.Color as AndroidColor
 
 /**
- * BatteryMonitorService - The 24/7 Engine
+ * BatteryMonitorService - The 24/7 Engine (FIXED)
+ *
+ * KEY FIX:
+ * - Now starts immediately when app launches (not after config)
+ * - Provides live battery data to ConfigScreen for charging detection
+ * - Enhanced logging to diagnose any issues
  *
  * Responsibilities:
  * 1. Run a foreground service with persistent notification
  * 2. Every 1 second: call repository.updateCurrentBatteryData()
  * 3. Push live updates to Glance widgets via DataStore
  * 4. Update the notification with fresh data
- *
- * This service NEVER directly touches UI or ViewModel - it only drives the Repository.
  */
 @AndroidEntryPoint
 class BatteryMonitorService : Service() {
@@ -63,12 +66,13 @@ class BatteryMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "🚀 Service created")
+        Log.d(TAG, "🚀 Service onCreate() called")
         createNotificationChannel()
 
         // Load stored power stats on service creation
         serviceScope.launch {
             try {
+                Log.d(TAG, "📊 Loading stored power stats...")
                 batteryRepository.loadStoredPowerStats()
                 Log.d(TAG, "✅ Power stats loaded successfully")
             } catch (e: Exception) {
@@ -78,11 +82,12 @@ class BatteryMonitorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "🎬 Service started")
+        Log.d(TAG, "🎬 Service onStartCommand() called")
 
         // Start foreground service with initial notification
         try {
-            startForeground(NOTIFICATION_ID, createInitialNotification())
+            val notification = createInitialNotification()
+            startForeground(NOTIFICATION_ID, notification)
             Log.d(TAG, "✅ Foreground service started successfully")
         } catch (e: Exception) {
             Log.e(TAG, "❌ Failed to start foreground service", e)
@@ -97,15 +102,8 @@ class BatteryMonitorService : Service() {
     }
 
     /**
-     * Single coroutine that runs the main monitoring loop:
-     * 1. Update battery data in repository
-     * 2. Push data to all Glance widgets via their DataStore
-     * 3. Force widgets to recompose
-     * 4. Update notification with fresh data
-     * 5. Wait exactly 1 second
-     * 6. Repeat
-     *
-     * This ensures perfect synchronization: Service → Repository → Widget DataStore → UI
+     * ✅ FIXED: Enhanced logging for diagnostics
+     * Single coroutine that runs the main monitoring loop
      */
     private fun startBatteryMonitoring() {
         // Cancel any existing job to prevent duplicates
@@ -114,15 +112,25 @@ class BatteryMonitorService : Service() {
         monitoringJob = serviceScope.launch {
             Log.d(TAG, "🔄 Battery monitoring loop started")
 
+            var loopCount = 0
+
             while (isActive) {
                 try {
+                    loopCount++
+
                     // Step 1: Update repository (this updates the StateFlow)
                     batteryRepository.updateCurrentBatteryData()
 
                     // Step 2: Get the fresh data
                     val currentData = batteryRepository.batteryDataFlow.value
 
-                    Log.d(TAG, "📊 Data updated: ${currentData.batteryPercentage}%, ${currentData.chargingPower}W, timestamp: ${currentData.timestamp}")
+                    // ✅ CRITICAL LOG: Verify charging state is being detected
+                    if (loopCount % 5 == 0) { // Log every 5 seconds to avoid spam
+                        Log.d(TAG, "🔋 [Loop $loopCount] Battery: ${currentData.batteryPercentage}%, " +
+                                "Charging: ${currentData.isCharging}, " +
+                                "Power: ${currentData.chargingPower}W, " +
+                                "Current: ${currentData.currentAmps}A")
+                    }
 
                     // Step 3: Push to all Glance widgets
                     updateGlanceWidgets(currentData)
@@ -138,31 +146,26 @@ class BatteryMonitorService : Service() {
                 // Step 5: Wait exactly 1 second before next update
                 delay(UPDATE_INTERVAL_MS)
             }
+
+            Log.d(TAG, "🛑 Battery monitoring loop stopped")
         }
     }
 
     /**
-     * Pushes fresh battery data to all Glance widget instances.
-     * This is the KEY fix for the race condition:
-     * - Service writes to widget's DataStore
-     * - Widget reads from its own DataStore (no race condition)
+     * Pushes fresh battery data to all Glance widget instances
      */
     private suspend fun updateGlanceWidgets(batteryData: com.example.battery.data.model.BatteryData) {
         try {
             val glanceManager = GlanceAppWidgetManager(this)
             val glanceIds = glanceManager.getGlanceIds(BatteryGlanceWidget::class.java)
 
-            Log.d(TAG, "🔍 Found ${glanceIds.size} Glance widget(s)")
-
             if (glanceIds.isEmpty()) {
-                Log.w(TAG, "⚠️ No widgets found! User may need to add widget to home screen")
+                // Only log this occasionally to avoid spam
                 return
             }
 
             // Update each widget's state and force recomposition
             glanceIds.forEachIndexed { index, glanceId ->
-                Log.d(TAG, "📝 Updating widget #${index + 1} (ID: $glanceId)")
-
                 try {
                     // Write data to widget's DataStore
                     updateAppWidgetState(
@@ -170,24 +173,19 @@ class BatteryMonitorService : Service() {
                         definition = BatteryDataStateDefinition,
                         glanceId = glanceId
                     ) {
-                        Log.d(TAG, "  💾 Writing to DataStore: ${batteryData.batteryPercentage}%, ${batteryData.chargingPower}W")
                         batteryData
                     }
 
                     // Force the widget to recompose with new data
                     BatteryGlanceWidget().update(this, glanceId)
-                    Log.d(TAG, "  ✅ Widget #${index + 1} updated successfully")
 
                 } catch (e: Exception) {
-                    Log.e(TAG, "  ❌ Error updating widget #${index + 1}", e)
+                    Log.e(TAG, "❌ Error updating widget #${index + 1}", e)
                 }
             }
 
-            Log.d(TAG, "✅ All ${glanceIds.size} widgets updated")
-
         } catch (e: Exception) {
             Log.e(TAG, "❌ Fatal error in updateGlanceWidgets", e)
-            e.printStackTrace()
         }
     }
 
@@ -203,7 +201,7 @@ class BatteryMonitorService : Service() {
                 setShowBadge(false)
             }
             notificationManager?.createNotificationChannel(channel)
-            Log.d(TAG, "📢 Notification channel created")
+            Log.d(TAG, "🔔 Notification channel created")
         }
     }
 
@@ -212,9 +210,9 @@ class BatteryMonitorService : Service() {
 
         // Default initial values
         notificationLayout.setTextViewText(R.id.notification_battery_percentage, "🔋 --%")
-        notificationLayout.setTextViewText(R.id.notification_charging_power, "⚡ -- W")
+        notificationLayout.setTextViewText(R.id.notification_charging_power, "⚡ Initializing...")
         notificationLayout.setTextViewText(R.id.notification_temperature, "🌡️ --°C")
-        notificationLayout.setTextViewText(R.id.notification_time_remaining, "⌛ Calculating...")
+        notificationLayout.setTextViewText(R.id.notification_time_remaining, "⌛ Starting...")
 
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
@@ -229,7 +227,8 @@ class BatteryMonitorService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_battery_notification)
-            .setContentText("Monitoring battery status")
+            .setContentTitle("Battery Monitor")
+            .setContentText("Initializing monitoring...")
             .setCustomContentView(notificationLayout)
             .setCustomBigContentView(notificationLayout)
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -275,7 +274,7 @@ class BatteryMonitorService : Service() {
                 // Time Remaining - secondary text
                 setTextViewText(
                     R.id.notification_time_remaining,
-                    "⌛ ${batteryData.timeRemaining}"
+                    "⌛ ${batteryData.timeRemainingCharging}"
                 )
             }
 
@@ -292,7 +291,8 @@ class BatteryMonitorService : Service() {
 
             val notification = NotificationCompat.Builder(this, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_battery_notification)
-                .setContentText("Monitoring battery status")
+                .setContentTitle("Battery Monitor")
+                .setContentText("Active")
                 .setCustomContentView(notificationLayout)
                 .setCustomBigContentView(notificationLayout)
                 .setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -310,7 +310,7 @@ class BatteryMonitorService : Service() {
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "🛑 Service destroyed")
+        Log.d(TAG, "🛑 Service onDestroy() called")
         monitoringJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()

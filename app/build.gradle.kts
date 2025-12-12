@@ -8,14 +8,14 @@ plugins {
 
 android {
     namespace = "com.example.battery"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.battery"
         minSdk = 23
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -77,6 +77,7 @@ dependencies {
 
     // Hilt for Dependency Injection
     implementation("com.google.dagger:hilt-android:2.52")
+    implementation(libs.androidx.foundation)
     ksp("com.google.dagger:hilt-android-compiler:2.52")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 

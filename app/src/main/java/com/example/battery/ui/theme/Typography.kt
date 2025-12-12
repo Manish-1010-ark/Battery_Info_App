@@ -6,66 +6,81 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import com.example.battery.R
 
 /**
- * Tecky/Futuristic Typography
+ * App Typography System
  *
- * Uses Roboto Mono for numeric displays to create a "digital readout" aesthetic.
- * Regular Roboto for labels and body text.
+ * A dual-font system that creates the "tecky" aesthetic:
+ * - Roboto for labels, body text, and UI elements (readable, clean)
+ * - Roboto Mono for numbers and data displays (technical, digital feel)
  *
- * If Roboto Mono font files are not available, the system will fall back to
- * the default monospace font.
+ * SETUP REQUIRED: Place these font files in res/font/ folder:
+ * - roboto_regular.ttf
+ * - robotomono_regular.ttf
  */
 
-// Monospace font family for numbers and technical data
-// Note: Add roboto_mono.ttf to res/font/ directory for custom font
-// For now, using system default monospace as fallback
-private val MonospaceFont = FontFamily.Monospace
+// === FONT FAMILIES ===
 
-// Regular font for text
-private val RegularFont = FontFamily.Default
+/** Standard UI font - Used for all text labels, body copy, buttons */
+private val AppFontFamily = FontFamily(
+    Font(R.font.roboto_regular, FontWeight.Normal)
+)
 
-val TeckyTypography = Typography(
-    // === DISPLAY STYLES (Large headlines) ===
+/** Monospace font - Used for all numeric displays (battery %, voltage, power, etc.) */
+private val MonoFontFamily = FontFamily(
+    Font(R.font.robotomono_regular, FontWeight.Normal)
+)
+
+// === MATERIAL 3 TYPOGRAPHY ===
+
+val AppTypography = Typography(
+
+    // === DISPLAY STYLES ===
+    // Large hero numbers - Battery percentage, charging power
     displayLarge = TextStyle(
-        fontFamily = MonospaceFont,
+        fontFamily = MonoFontFamily,  // Monospace for that digital readout look
         fontWeight = FontWeight.Bold,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
-        letterSpacing = (-0.25).sp
+        fontSize = 72.sp,
+        lineHeight = 80.sp,
+        letterSpacing = (-0.5).sp
     ),
+
     displayMedium = TextStyle(
-        fontFamily = MonospaceFont,
+        fontFamily = MonoFontFamily,  // Main data displays (76%, 13.2W)
         fontWeight = FontWeight.Bold,
-        fontSize = 45.sp,
+        fontSize = 56.sp,
+        lineHeight = 64.sp,
+        letterSpacing = 0.sp
+    ),
+
+    displaySmall = TextStyle(
+        fontFamily = MonoFontFamily,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 44.sp,
         lineHeight = 52.sp,
         letterSpacing = 0.sp
     ),
-    displaySmall = TextStyle(
-        fontFamily = MonospaceFont,
+
+    // === HEADLINE STYLES ===
+    headlineLarge = TextStyle(
+        fontFamily = MonoFontFamily,  // Large numeric data
         fontWeight = FontWeight.Bold,
         fontSize = 36.sp,
         lineHeight = 44.sp,
         letterSpacing = 0.sp
     ),
 
-    // === HEADLINE STYLES ===
-    headlineLarge = TextStyle(
-        fontFamily = MonospaceFont,
+    headlineMedium = TextStyle(
+        fontFamily = MonoFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 32.sp,
         lineHeight = 40.sp,
         letterSpacing = 0.sp
     ),
-    headlineMedium = TextStyle(
-        fontFamily = MonospaceFont,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
-        letterSpacing = 0.sp
-    ),
+
     headlineSmall = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = MonoFontFamily,  // Card stats (4.12V, 3.2A, 42°C)
         fontWeight = FontWeight.SemiBold,
         fontSize = 24.sp,
         lineHeight = 32.sp,
@@ -74,44 +89,48 @@ val TeckyTypography = Typography(
 
     // === TITLE STYLES ===
     titleLarge = TextStyle(
-        fontFamily = RegularFont,
-        fontWeight = FontWeight.SemiBold,
+        fontFamily = AppFontFamily,  // Section headers
+        fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
         letterSpacing = 0.sp
     ),
+
     titleMedium = TextStyle(
-        fontFamily = RegularFont,
-        fontWeight = FontWeight.Medium,
-        fontSize = 16.sp,
+        fontFamily = AppFontFamily,  // Card titles, tab labels
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.15.sp
     ),
+
     titleSmall = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Small section headers
         fontWeight = FontWeight.Medium,
-        fontSize = 14.sp,
+        fontSize = 16.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
 
     // === BODY STYLES ===
     bodyLarge = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Main body text
         fontWeight = FontWeight.Normal,
         fontSize = 16.sp,
         lineHeight = 24.sp,
         letterSpacing = 0.5.sp
     ),
+
     bodyMedium = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Standard text
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.25.sp
     ),
+
     bodySmall = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Small descriptive text
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp,
@@ -120,21 +139,23 @@ val TeckyTypography = Typography(
 
     // === LABEL STYLES ===
     labelLarge = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Large buttons
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
         lineHeight = 20.sp,
         letterSpacing = 0.1.sp
     ),
+
     labelMedium = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Standard labels (Voltage, Current, etc.)
         fontWeight = FontWeight.Medium,
         fontSize = 12.sp,
         lineHeight = 16.sp,
         letterSpacing = 0.5.sp
     ),
+
     labelSmall = TextStyle(
-        fontFamily = RegularFont,
+        fontFamily = AppFontFamily,  // Small labels, hints
         fontWeight = FontWeight.Medium,
         fontSize = 11.sp,
         lineHeight = 16.sp,
@@ -143,38 +164,61 @@ val TeckyTypography = Typography(
 )
 
 /**
- * Custom text styles for specific use cases
+ * Custom Text Styles for specific use cases beyond Material 3
  */
-object TeckyTextStyles {
-    /** Large numeric display (battery %, charging power) */
-    val NumericLarge = TextStyle(
-        fontFamily = MonospaceFont,
-        fontWeight = FontWeight.Bold,
-        fontSize = 48.sp,
-        letterSpacing = 0.sp
+object AppTextStyles {
+
+    /** Extra large hero number (e.g., main battery percentage on home screen) */
+    val HeroNumber = TextStyle(
+        fontFamily = MonoFontFamily,
+        fontWeight = FontWeight.ExtraBold,
+        fontSize = 96.sp,
+        lineHeight = 104.sp,
+        letterSpacing = (-1).sp
     )
 
-    /** Medium numeric display (voltage, current, temperature) */
-    val NumericMedium = TextStyle(
-        fontFamily = MonospaceFont,
+    /** Medium data display with mono spacing (graph values, stats) */
+    val DataMedium = TextStyle(
+        fontFamily = MonoFontFamily,
         fontWeight = FontWeight.SemiBold,
-        fontSize = 24.sp,
+        fontSize = 20.sp,
+        lineHeight = 28.sp,
         letterSpacing = 0.sp
     )
 
-    /** Small numeric display (graph labels, stats) */
-    val NumericSmall = TextStyle(
-        fontFamily = MonospaceFont,
+    /** Small mono numbers (timeline labels, small stats) */
+    val DataSmall = TextStyle(
+        fontFamily = MonoFontFamily,
         fontWeight = FontWeight.Medium,
         fontSize = 14.sp,
+        lineHeight = 20.sp,
         letterSpacing = 0.sp
     )
 
-    /** Label text (non-numeric) */
-    val Label = TextStyle(
-        fontFamily = RegularFont,
+    /** Extra small mono (graph axis labels) */
+    val DataTiny = TextStyle(
+        fontFamily = MonoFontFamily,
         fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        letterSpacing = 0.25.sp
+        fontSize = 10.sp,
+        lineHeight = 14.sp,
+        letterSpacing = 0.sp
+    )
+
+    /** Unit label (W, V, A, °C - appears next to numbers) */
+    val Unit = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 18.sp,
+        lineHeight = 24.sp,
+        letterSpacing = 0.sp
+    )
+
+    /** Small unit label */
+    val UnitSmall = TextStyle(
+        fontFamily = AppFontFamily,
+        fontWeight = FontWeight.Normal,
+        fontSize = 12.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.sp
     )
 }

@@ -1,7 +1,6 @@
 package com.example.battery.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
@@ -11,83 +10,125 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 /**
- * Tecky/Futuristic Dark Theme
+ * App Theme
  *
- * A Material 3 theme optimized for dark environments with high-contrast,
- * glowing accents that create a cyberpunk/tech aesthetic.
+ * A sophisticated dark theme designed for battery monitoring with:
+ * - Deep navy backgrounds for OLED optimization
+ * - Dynamic accent colors that change based on battery state
+ * - Monospace typography for technical data displays
+ * - Mint green accents for the "tecky" aesthetic
  */
 
-private val TeckyColorScheme = darkColorScheme(
+private val DarkColorScheme = darkColorScheme(
     // === PRIMARY COLORS ===
-    primary = ElectricBlue,              // Main accent - buttons, FABs, important elements
-    onPrimary = BackgroundBlack,         // Text on primary color
-    primaryContainer = ElectricBlueDark, // Container for primary elements
-    onPrimaryContainer = TextPrimary,    // Text on primary containers
+    // Mint accent used for primary actions, highlights, and interactive elements
+    primary = AppColors.AccentMint,
+    onPrimary = AppColors.Background,
+    primaryContainer = AppColors.AccentMintDim,
+    onPrimaryContainer = AppColors.TextPrimary,
 
     // === SECONDARY COLORS ===
-    secondary = ElectricBlueLight,       // Secondary accent
-    onSecondary = BackgroundBlack,       // Text on secondary
-    secondaryContainer = SurfaceLight,   // Secondary containers
-    onSecondaryContainer = TextPrimary,  // Text on secondary containers
+    // Subtle secondary actions and less prominent UI elements
+    secondary = AppColors.TextSecondary,
+    onSecondary = AppColors.Background,
+    secondaryContainer = AppColors.CardBackground,
+    onSecondaryContainer = AppColors.TextSecondary,
 
     // === TERTIARY COLORS ===
-    tertiary = NeonOrange,               // Tertiary accent (for temperature, etc.)
-    onTertiary = BackgroundBlack,        // Text on tertiary
-    tertiaryContainer = SurfaceDark,     // Tertiary containers
-    onTertiaryContainer = TextPrimary,   // Text on tertiary containers
+    // Used for state indicators and dynamic elements
+    tertiary = AppColors.StateCharging,
+    onTertiary = AppColors.Background,
+    tertiaryContainer = AppColors.CardBackground,
+    onTertiaryContainer = AppColors.StateCharging,
 
     // === BACKGROUND COLORS ===
-    background = BackgroundBlack,        // Main background
-    onBackground = TextPrimary,          // Text on background
+    background = AppColors.Background,
+    onBackground = AppColors.TextPrimary,
 
     // === SURFACE COLORS ===
-    surface = SurfaceDark,               // Cards, dialogs, bottom sheets
-    onSurface = TextPrimary,             // Text on surfaces
-    surfaceVariant = SurfaceLight,       // Variant surfaces (slightly lighter)
-    onSurfaceVariant = TextSecondary,    // Text on variant surfaces
+    // Cards, dialogs, bottom sheets
+    surface = AppColors.CardBackground,
+    onSurface = AppColors.TextPrimary,
+    surfaceVariant = AppColors.Background,
+    onSurfaceVariant = AppColors.TextSecondary,
+
+    // === CONTAINER COLORS ===
+    surfaceContainer = AppColors.CardBackground,
+    surfaceContainerHigh = AppColors.CardBackground,
+    surfaceContainerHighest = AppColors.Outline,
+    surfaceContainerLow = AppColors.Background,
+    surfaceContainerLowest = AppColors.Background,
 
     // === OUTLINE COLORS ===
-    outline = TextTertiary,              // Borders, dividers
-    outlineVariant = TextTertiary.copy(alpha = 0.5f), // Subtle dividers
+    outline = AppColors.Outline,
+    outlineVariant = AppColors.Divider,
 
     // === ERROR COLORS ===
-    error = NeonRed,                     // Error states, alerts
-    onError = BackgroundBlack,           // Text on error color
-    errorContainer = NeonRed.copy(alpha = 0.2f), // Error backgrounds
-    onErrorContainer = NeonRed,          // Text on error containers
+    error = AppColors.StateCritical,
+    onError = AppColors.TextPrimary,
+    errorContainer = AppColors.StateCritical.copy(alpha = 0.2f),
+    onErrorContainer = AppColors.StateCritical,
 
     // === INVERSE COLORS ===
-    inverseSurface = TextPrimary,        // Inverse of surface (light on dark theme)
-    inverseOnSurface = BackgroundBlack,  // Text on inverse surface
-    inversePrimary = ElectricBlueDark,   // Inverse primary
+    inverseSurface = AppColors.TextPrimary,
+    inverseOnSurface = AppColors.Background,
+    inversePrimary = AppColors.AccentMintDim,
 
     // === SCRIM ===
-    scrim = BackgroundBlack.copy(alpha = 0.8f) // Overlay for modals
+    scrim = AppColors.Background.copy(alpha = 0.85f)
 )
 
+/**
+ * Main theme composable for the Battery Monitoring App
+ *
+ * Features:
+ * - Always uses dark theme (optimized for OLED displays)
+ * - Sets status bar and navigation bar to match background
+ * - Applies custom typography with monospace for numbers
+ * - Provides Material 3 color scheme with dynamic state colors
+ */
 @Composable
 fun BatteryTheme(
-    darkTheme: Boolean = true, // Always dark - this is a tecky theme!
     content: @Composable () -> Unit
 ) {
-    val colorScheme = TeckyColorScheme
-
+    val colorScheme = DarkColorScheme
     val view = LocalView.current
+
+    // Configure system bars to match theme
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+
+            // Set status bar and navigation bar to deep navy background
             window.statusBarColor = colorScheme.background.toArgb()
             window.navigationBarColor = colorScheme.background.toArgb()
+
+            // Always use light icons/text on dark background
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = false // Always dark status bar
-                isAppearanceLightNavigationBars = false // Always dark nav bar
+                isAppearanceLightStatusBars = false
+                isAppearanceLightNavigationBars = false
             }
         }
     }
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = TeckyTypography,
+        typography = AppTypography,
+        content = content
+    )
+}
+
+/**
+ * Preview theme for Compose previews
+ * Same as main theme but without window configuration
+ */
+@Composable
+fun BatteryThemePreview(
+    content: @Composable () -> Unit
+) {
+    MaterialTheme(
+        colorScheme = DarkColorScheme,
+        typography = AppTypography,
         content = content
     )
 }

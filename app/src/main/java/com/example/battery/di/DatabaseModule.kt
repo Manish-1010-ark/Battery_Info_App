@@ -3,7 +3,9 @@ package com.example.battery.di
 import android.content.Context
 import androidx.room.Room
 import com.example.battery.data.db.AppDatabase
-import com.example.battery.data.db.GraphDataDao
+import com.example.battery.data.db.ChargingPowerDao
+import com.example.battery.data.db.DischargingPowerDao
+import com.example.battery.data.db.TemperatureDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -14,11 +16,11 @@ import javax.inject.Singleton
 /**
  * DatabaseModule - Provides Room Database dependencies
  *
- * This module ONLY provides:
+ * This module provides:
  * - AppDatabase (the Room database instance)
- * - GraphDataDao (the DAO for accessing graph data)
- *
- * NOTE: ConfigDataStore is provided in DataStoreModule, NOT here!
+ * - ChargingPowerDao (DAO for charging power data)
+ * - DischargingPowerDao (DAO for discharging power data)
+ * - TemperatureDao (DAO for temperature data)
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -40,7 +42,19 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideGraphDataDao(database: AppDatabase): GraphDataDao {
-        return database.graphDataDao()
+    fun provideChargingPowerDao(database: AppDatabase): ChargingPowerDao {
+        return database.chargingPowerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideDischargingPowerDao(database: AppDatabase): DischargingPowerDao {
+        return database.dischargingPowerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTemperatureDao(database: AppDatabase): TemperatureDao {
+        return database.temperatureDao()
     }
 }
